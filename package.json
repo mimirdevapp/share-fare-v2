@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "homepage": "https://mimirdevapp.github.io/share-fare-v2",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
