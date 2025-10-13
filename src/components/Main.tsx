@@ -1,0 +1,538 @@
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Users, ReceiptIndianRupee, Calculator, ListChecks, ReceiptText, BadgePercent } from 'lucide-react';
+
+// Color palette for friend avatars
+const AVATAR_COLORS = [
+  'bg-blue-500',
+  'bg-green-500',
+  'bg-purple-500',
+  'bg-pink-500',
+  'bg-yellow-500',
+  'bg-red-500',
+  'bg-indigo-500',
+  'bg-teal-500',
+  'bg-orange-500',
+  'bg-cyan-500',
+];
+
+// Helper function to get friend color
+const getFriendColor = (index) => {
+  return AVATAR_COLORS[index % AVATAR_COLORS.length];
+};
+
+// Helper function to get initials
+const getInitials = (name) => {
+  return name
+    .split(' ')
+    .map(word => word[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+export default function Main() {
+  const [billAmount, setBillAmount] = useState('');
+  const [currentBillId, setCurrentBillId] = useState(null);
+  const [friends, setFriends] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [expenseShares, setExpenseShares] = useState([]);
+  const [savedFriendNames, setSavedFriendNames] = useState([]);
+
+  const [newFriendName, setNewFriendName] = useState('');
+  const [newExpense, setNewExpense] = useState({ dish_name: '', cost: '' });
+  const [selectedFriends, setSelectedFriends] = useState([]);
+
+  const [taxAmount, setTaxAmount] = useState('0');
+  const [serviceFee, setServiceFee] = useState('0');
+  const [tips, setTips] = useState('0');
+  const [discountType, setDiscountType] = useState('flat');
+  const [discountValue, setDiscountValue] = useState('0');
+
+  // Load saved friends on mount
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('shareFareFriends');
+      if (saved) {
+        setSavedFriendNames(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.log('Session storage not available');
+    }
+  }, []);
+
+  // Save friends whenever they change
+  useEffect(() => {
+    if (friends.length > 0) {
+      const names = friends.map(f => f.name);
+      try {
+        sessionStorage.setItem('shareFareFriends', JSON.stringify(names));
+        setSavedFriendNames(names);
+      } catch (e) {
+        console.log('Session storage not available');
+      }
+    }
+  }, [friends]);
+
+  const createBill = () => {
+    if (!billAmount || parseFloat(billAmount) <= 0) return;
+    setCurrentBillId(Date.now().toString());
+  };
+
+  const addFriend = () => {
+    if (!newFriendName.trim() || !currentBillId) return;
+
+    const newFriend = {
+      id: Date.now().toString(),
+      name: newFriendName.trim()
+    };
+
+    setFriends([...friends, newFriend]);
+    setNewFriendName('');
+  };
+
+  const removeFriend = (friendId) => {
+    setFriends(friends.filter(f => f.id !== friendId));
+    setExpenseShares(expenseShares.filter(es => es.friend_id !== friendId));
+  };
+
+  const addExpense = () => {
+    if (!newExpense.dish_name.trim() || !newExpense.cost || parseFloat(newExpense.cost) <= 0 || !currentBillId || selectedFriends.length === 0) return;
+
+    const expense = {
+      id: Date.now().toString(),
+      dish_name: newExpense.dish_name.trim(),
+      cost: parseFloat(newExpense.cost)
+    };
+
+    setExpenses([...expenses, expense]);
+
+    const shares = selectedFriends.map(friendId => ({
+      id: `${expense.id}-${friendId}`,
+      expense_id: expense.id,
+      friend_id: friendId
+    }));
+
+    setExpenseShares([...expenseShares, ...shares]);
+    setNewExpense({ dish_name: '', cost: '' });
+    setSelectedFriends([]);
+  };
+
+  const removeExpense = (expenseId) => {
+    setExpenses(expenses.filter(e => e.id !== expenseId));
+    setExpenseShares(expenseShares.filter(es => es.expense_id !== expenseId));
+  };
+
+  const calculateSplit = () => {
+    if (friends.length === 0) {
+      return { perPerson: {}, totalCalculated: 0, difference: 0 };
+    }
+
+    const perPerson = {};
+
+    friends.forEach(friend => {
+      perPerson[friend.id] = { name: friend.name, amount: 0, items: [] };
+    });
+
+    let totalExpenses = 0;
+    expenses.forEach(expense => {
+      const shareCount = expenseShares.filter(es => es.expense_id === expense.id).length;
+      if (shareCount > 0) {
+        const perPersonCost = expense.cost / shareCount;
+        expenseShares.forEach(share => {
+          if (share.expense_id === expense.id && perPerson[share.friend_id]) {
+            perPerson[share.friend_id].amount += perPersonCost;
+            perPerson[share.friend_id].items.push(`${expense.dish_name} (${shareCount > 1 ? 'shared' : 'solo'})`);
+          }
+        });
+        totalExpenses += expense.cost;
+      }
+    });
+
+    const discountAmount = discountType === 'percentage'
+      ? (totalExpenses * parseFloat(discountValue) / 100)
+      : parseFloat(discountValue);
+
+    const afterDiscount = totalExpenses - discountAmount;
+    const commonTotal = parseFloat(taxAmount) + parseFloat(serviceFee) + parseFloat(tips);
+    const perPersonCommonCost = commonTotal / friends.length;
+
+    const itemsSubtotal = totalExpenses;
+    const totalWithCommonCosts = afterDiscount + commonTotal;
+
+    friends.forEach(friend => {
+      const friendItemTotal = perPerson[friend.id].amount;
+      const friendProportion = itemsSubtotal > 0 ? friendItemTotal / itemsSubtotal : 1 / friends.length;
+      const friendDiscount = discountAmount * friendProportion;
+
+      perPerson[friend.id].amount = friendItemTotal - friendDiscount + perPersonCommonCost;
+    });
+
+    const totalCalculated = Object.values(perPerson).reduce((sum, person) => sum + person.amount, 0);
+    const difference = parseFloat(billAmount) - totalCalculated;
+
+    return { perPerson, totalCalculated, difference };
+  };
+
+  const { perPerson, totalCalculated, difference } = calculateSplit();
+
+  const toggleFriendSelection = (friendId) => {
+    setSelectedFriends(prev =>
+      prev.includes(friendId) ? prev.filter(id => id !== friendId) : [...prev, friendId]
+    );
+  };
+
+  const resetBill = () => {
+    setBillAmount('');
+    setCurrentBillId(null);
+    setFriends([]);
+    setExpenses([]);
+    setExpenseShares([]);
+    setNewFriendName('');
+    setNewExpense({ dish_name: '', cost: '' });
+    setSelectedFriends([]);
+    setTaxAmount('0');
+    setServiceFee('0');
+    setTips('0');
+    setDiscountValue('0');
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-3">
+            <ReceiptIndianRupee className="w-10 h-10 text-blue-600" />
+            Share Fare
+          </h1>
+          <p className="text-slate-600">Split bills fairly among friends</p>
+        </div>
+
+        {!currentBillId ? (
+          <div className="bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto">
+            <h2 className="text-2xl font-semibold text-slate-800 mb-4">Enter Bill Amount</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Total Bill Amount
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={billAmount}
+                  onChange={(e) => setBillAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                />
+              </div>
+              <button
+                onClick={createBill}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+              >
+                Start Splitting
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  Friends
+                </h2>
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newFriendName}
+                    onChange={(e) => setNewFriendName(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addFriend()}
+                    placeholder="Friend's name"
+                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={addFriend}
+                    className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-colors"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {friends.map((friend, index) => (
+                    <div key={friend.id} className="flex items-center justify-between bg-slate-50 px-4 py-3 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full ${getFriendColor(index)} flex items-center justify-center text-white font-semibold shadow-md`}>
+                          {getInitials(friend.name)}
+                        </div>
+                        <span className="font-medium text-slate-700">{friend.name}</span>
+                      </div>
+                      <button
+                        onClick={() => removeFriend(friend.id)}
+                        className="text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {friends.length === 0 && (
+                    <div className="text-slate-500 text-center py-4">
+                      <p className="mb-2">No friends added yet</p>
+                      {savedFriendNames.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm mb-2">Quick add from previous sessions:</p>
+                          <div className="flex flex-wrap gap-2 justify-center">
+                            {savedFriendNames.slice(0, 5).map((name, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setNewFriendName(name);
+                                }}
+                                className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm hover:bg-blue-200 transition-colors"
+                              >
+                                {name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <ListChecks className="w-5 h-5 text-blue-600" />
+                  Expenses
+                </h2>
+                <div className="space-y-4 mb-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={newExpense.dish_name}
+                      onChange={(e) => setNewExpense({ ...newExpense, dish_name: e.target.value })}
+                      placeholder="Dish name"
+                      className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newExpense.cost}
+                      onChange={(e) => setNewExpense({ ...newExpense, cost: e.target.value })}
+                      placeholder="Cost"
+                      className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  {friends.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Who ordered this?
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {friends.map((friend, index) => (
+                          <button
+                            key={friend.id}
+                            onClick={() => toggleFriendSelection(friend.id)}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                              selectedFriends.includes(friend.id)
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            <div className={`w-6 h-6 rounded-full ${selectedFriends.includes(friend.id) ? 'bg-white/20' : getFriendColor(index)} flex items-center justify-center text-xs font-semibold ${selectedFriends.includes(friend.id) ? 'text-white' : 'text-white'}`}>
+                              {getInitials(friend.name)}
+                            </div>
+                            {friend.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={addExpense}
+                    disabled={!newExpense.dish_name || !newExpense.cost || selectedFriends.length === 0}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Expense
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {expenses.map(expense => {
+                    const sharedByIds = expenseShares
+                      .filter(es => es.expense_id === expense.id)
+                      .map(es => es.friend_id);
+                    const sharedByFriends = sharedByIds
+                      .map(id => friends.find(f => f.id === id))
+                      .filter(Boolean);
+                    
+                    return (
+                      <div key={expense.id} className="flex items-start justify-between bg-slate-50 px-4 py-3 rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-medium text-slate-800">{expense.dish_name}</div>
+                          <div className="text-sm text-slate-600 flex items-center gap-2 mt-1">
+                            <span>₹ {expense.cost.toFixed(2)}</span>
+                            <span>•</span>
+                            <div className="flex items-center gap-1">
+                              {sharedByFriends.map((friend, idx) => {
+                                const friendIndex = friends.findIndex(f => f.id === friend.id);
+                                return (
+                                  <div
+                                    key={friend.id}
+                                    className={`w-6 h-6 rounded-full ${getFriendColor(friendIndex)} flex items-center justify-center text-xs font-semibold text-white border-2 border-white shadow-sm`}
+                                    title={friend.name}
+                                  >
+                                    {getInitials(friend.name)}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeExpense(expense.id)}
+                          className="text-red-500 hover:text-red-700 transition-colors ml-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {expenses.length === 0 && (
+                    <p className="text-slate-500 text-center py-4">No expenses added yet</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <ReceiptText className="w-5 h-5 text-blue-600" />
+                  Common Costs
+                </h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Tax</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={taxAmount}
+                      onChange={(e) => setTaxAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Service Fee</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={serviceFee}
+                      onChange={(e) => setServiceFee(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Tips</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={tips}
+                      onChange={(e) => setTips(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <BadgePercent className="w-5 h-5 text-blue-600" />
+                  Discount
+                </h2>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder="0.00"
+                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <select
+                    value={discountType}
+                    onChange={(e) => setDiscountType(e.target.value)}
+                    className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  >
+                    <option value="flat">₹</option>
+                    <option value="percentage">%</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-xl shadow-lg p-6 sticky top-8">
+                <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <Calculator className="w-5 h-5 text-blue-600" />
+                  Summary
+                </h2>
+                <div className="space-y-4">
+                  <div className="pb-4 border-b border-slate-200">
+                    <div className="flex justify-between text-sm text-slate-600 mb-1">
+                      <span>Bill Amount:</span>
+                      <span className="font-semibold">₹ {parseFloat(billAmount).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-slate-600 mb-1">
+                      <span>Calculated Total:</span>
+                      <span className="font-semibold">₹ {totalCalculated.toFixed(2)}</span>
+                    </div>
+                    <div className={`flex justify-between text-sm font-semibold ${
+                      Math.abs(difference) < 0.01 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      <span>Difference:</span>
+                      <span>₹ {Math.abs(difference).toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {Object.values(perPerson).map((person, index) => (
+                      <div key={person.name} className="bg-slate-50 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full ${getFriendColor(index)} flex items-center justify-center text-white font-semibold text-sm shadow-md`}>
+                              {getInitials(person.name)}
+                            </div>
+                            <span className="font-semibold text-slate-800">{person.name}</span>
+                          </div>
+                          <span className="text-lg font-bold text-blue-600">₹ {person.amount.toFixed(2)}</span>
+                        </div>
+                        {person.items.length > 0 && (
+                          <div className="text-xs text-slate-600 space-y-1 ml-10">
+                            {person.items.map((item, idx) => (
+                              <div key={idx}>• {item}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {friends.length === 0 && (
+                      <p className="text-slate-500 text-center py-4">Add friends to see split</p>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={resetBill}
+                    className="w-full bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors mt-4"
+                  >
+                    New Bill
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
