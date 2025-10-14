@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Users, ReceiptIndianRupee, Calculator, ListChecks, ReceiptText, BadgePercent, Camera, Upload, Loader2, X, Edit2, Check } from 'lucide-react';
+import { Plus, Trash2, Users, ReceiptIndianRupee, Calculator, ListChecks, ReceiptText, BadgePercent, ScanText, Loader2, X, Edit2, Check, Hash } from 'lucide-react';
 
 // Color palette for friend avatars
 const AVATAR_COLORS = [
@@ -14,6 +14,11 @@ const AVATAR_COLORS = [
   'bg-orange-500',
   'bg-cyan-500',
 ];
+
+const FRIEND_GROUPS = {
+  'ecityhp': ['Shetty', 'Madhu', 'Shaun', 'Sai', 'Calvin', 'Gaman', 'Rishika', 'Siddhanth', 'Sharanya', 'Rachana'],
+  'hsr': ['Calvin', 'Gaman', 'Hardhik', 'Jason'],
+};
 
 // Helper function to get friend color
 const getFriendColor = (index) => {
@@ -39,6 +44,8 @@ export default function Main() {
   const [savedFriendNames, setSavedFriendNames] = useState([]);
 
   const [newFriendName, setNewFriendName] = useState('');
+  const [groupCode, setGroupCode] = useState('');
+  const [groupCodeError, setGroupCodeError] = useState('');
   const [newExpense, setNewExpense] = useState({ dish_name: '', cost: '' });
   const [selectedFriends, setSelectedFriends] = useState([]);
 
@@ -48,7 +55,6 @@ export default function Main() {
   const [discountType, setDiscountType] = useState('flat');
   const [discountValue, setDiscountValue] = useState('0');
 
-  const [apiKey, setApiKey] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef(null);
@@ -170,6 +176,27 @@ export default function Main() {
 
     setFriends([...friends, newFriend]);
     setNewFriendName('');
+  };
+
+  const applyGroupCode = () => {
+    if (!groupCode.trim() || !currentBillId) return;
+
+    const friendNames = FRIEND_GROUPS[groupCode.toLowerCase()];
+    
+    if (!friendNames) {
+      setGroupCodeError('Invalid group code');
+      return;
+    }
+
+    // Add all friends from the group
+    const newFriends = friendNames.map((name, index) => ({
+      id: `${Date.now()}-${index}`,
+      name: name
+    }));
+
+    setFriends([...friends, ...newFriends]);
+    setGroupCode('');
+    setGroupCodeError('');
   };
 
   const removeFriend = (friendId) => {
@@ -311,6 +338,8 @@ export default function Main() {
     setExpenses([]);
     setExpenseShares([]);
     setNewFriendName('');
+    setGroupCode('');
+    setGroupCodeError('');
     setNewExpense({ dish_name: '', cost: '' });
     setSelectedFriends([]);
     setTaxAmount('0');
@@ -380,8 +409,8 @@ export default function Main() {
                     </>
                   ) : (
                     <>
-                      <Camera className="w-5 h-5" />
-                      Upload Bill Image
+                      <ScanText className="w-5 h-5" />
+                      Scan Bill
                     </>
                   )}
                 </button>
@@ -408,6 +437,34 @@ export default function Main() {
                   <Users className="w-5 h-5 text-blue-600" />
                   Friends
                 </h2>
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                  <Hash className="w-4 h-4" />
+                    Group Code (optional)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={groupCode}
+                      onChange={(e) => {
+                        setGroupCode(e.target.value);
+                        setGroupCodeError('');
+                      }}
+                      onKeyPress={(e) => e.key === 'Enter' && applyGroupCode()}
+                      placeholder="Enter group code"
+                      className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={applyGroupCode}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  {groupCodeError && (
+                    <p className="text-sm text-red-600 mt-2">{groupCodeError}</p>
+                  )}
+                </div>
                 <div className="flex gap-2 mb-4">
                   <input
                     type="text"
