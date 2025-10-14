@@ -437,8 +437,8 @@ export default function Main() {
                   <Users className="w-5 h-5 text-blue-600" />
                   Friends
                 </h2>
-                <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                  <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                <div className="mb-4 px-1.5 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-1 px-1">
                   <Hash className="w-4 h-4" />
                     Group Code (optional)
                   </label>
