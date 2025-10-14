@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Users, ReceiptIndianRupee, Calculator, ListChecks, ReceiptText, Send , BadgePercent, ScanText, Loader2, X, Edit2, Check, Hash } from 'lucide-react';
+import { Plus, Trash2, Users, ReceiptIndianRupee, Calculator, ListChecks, ReceiptText, Send, ExternalLink, BadgePercent, ScanText, Loader2, X, Edit2, Check, Hash } from 'lucide-react';
 
 // Color palette for friend avatars
 const AVATAR_COLORS = [
@@ -72,6 +72,8 @@ export default function Main() {
 
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [editingExpenseShares, setEditingExpenseShares] = useState([]);
+
+  const [splitwiseLoading, setSplitWiseLoading] = useState(false);
 
   // Load saved friends and API key on mount
   useEffect(() => {
@@ -266,6 +268,53 @@ export default function Main() {
     );
   };
 
+  const sendToSplitwise = async () => {
+  // Note: This requires your backend to handle OAuth
+  // You'll need to set up a backend endpoint that:
+  // 1. Handles Splitwise OAuth flow
+  // 2. Creates expenses with the split data
+  
+    setSplitWiseLoading(true);
+    
+    try {
+      const expenseData = Object.values(perPerson).map(person => ({
+        name: person.name,
+        amount: person.amount,
+        items: person.items
+      }));
+
+      const response = await fetch('YOUR_BACKEND_URL/api/splitwise/add-expense', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          billAmount: parseFloat(billAmount),
+          billDescription: 'Bill Split - ShareFare',
+          expenses: expenseData,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to sync with Splitwise');
+      }
+
+      const data = await response.json();
+      
+      // Redirect to Splitwise or show success
+      if (data.redirectUrl) {
+        window.open(data.redirectUrl, '_blank');
+      } else {
+        alert('Expenses added to Splitwise successfully!');
+      }
+    } catch (error) {
+      throw new Error(error.message);
+    } finally {
+      setSplitWiseLoading(false);
+    }
+  };
+
   const saveExpenseShares = () => {
     if (!editingExpenseId) return;
 
@@ -372,7 +421,7 @@ export default function Main() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-3">
+          <h1 onClick={() => resetBill()}className="text-4xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-3">
             <ReceiptIndianRupee className="w-10 h-10 text-blue-600" />
             ShareFare
           </h1>
@@ -839,11 +888,22 @@ export default function Main() {
                       <Send className="w-4 h-4" />
                       Share on WhatsApp
                     </button>
-                    <button
-                      onClick={resetBill}
-                      className="w-full bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                     <button
+                      onClick={sendToSplitwise}
+                      disabled={friends.length === 0 || splitwiseLoading}
+                      className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                     >
-                      New Bill
+                      {splitwiseLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <ExternalLink className="w-4 h-4" />
+                          Add to Splitwise
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
