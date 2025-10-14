@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Users, ReceiptIndianRupee, Calculator, ListChecks, ReceiptText, BadgePercent } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Users, ReceiptIndianRupee, Calculator, ListChecks, ReceiptText, BadgePercent, Camera, Upload, Loader2, X, Edit2, Check } from 'lucide-react';
 
 // Color palette for friend avatars
 const AVATAR_COLORS = [
@@ -48,7 +48,15 @@ export default function Main() {
   const [discountType, setDiscountType] = useState('flat');
   const [discountValue, setDiscountValue] = useState('0');
 
-  // Load saved friends on mount
+  const [apiKey, setApiKey] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = useRef(null);
+
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [editingExpenseShares, setEditingExpenseShares] = useState([]);
+
+  // Load saved friends and API key on mount
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem('shareFareFriends');
@@ -76,6 +84,80 @@ export default function Main() {
   const createBill = () => {
     if (!billAmount || parseFloat(billAmount) <= 0) return;
     setCurrentBillId(Date.now().toString());
+  };
+
+  const processBillImage = async (file) => {
+    setIsProcessing(true);
+    setUploadError('');
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("https://enki-service.vercel.app/api/share-fare-service", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'Failed to process image');
+      }
+  
+      const data = await response.json();
+
+      if (!data.success || !data.billData) {
+        throw new Error('Invalid response format from server');
+      }
+
+      const billData = data.billData;
+
+      // Set bill amount
+      if (billData.total) {
+        setBillAmount(billData.total.toString());
+      }
+
+      // Create bill and add expenses
+      const newBillId = Date.now().toString();
+      setCurrentBillId(newBillId);
+
+      // Set common costs
+      if (billData.tax) setTaxAmount(billData.tax.toString());
+      if (billData.serviceFee) setServiceFee(billData.serviceFee.toString());
+      if (billData.tips) setTips(billData.tips.toString());
+      if (billData.discount) {
+        setDiscountValue(billData.discount.toString());
+        setDiscountType('flat');
+      }
+
+      // Add items as expenses (without any friend assignments initially)
+      if (billData.items && billData.items.length > 0) {
+        const newExpenses = billData.items.map((item, index) => ({
+          id: `${newBillId}-${index}`,
+          dish_name: item.name,
+          cost: parseFloat(item.price)
+        }));
+        setExpenses(newExpenses);
+      }
+
+      setUploadError('');
+    } catch (error) {
+      console.error('Error processing bill:', error);
+      setUploadError(error.message || 'Failed to process bill image. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setUploadError('Please upload an image file');
+        return;
+      }
+      processBillImage(file);
+    }
   };
 
   const addFriend = () => {
@@ -120,6 +202,47 @@ export default function Main() {
   const removeExpense = (expenseId) => {
     setExpenses(expenses.filter(e => e.id !== expenseId));
     setExpenseShares(expenseShares.filter(es => es.expense_id !== expenseId));
+    if (editingExpenseId === expenseId) {
+      setEditingExpenseId(null);
+      setEditingExpenseShares([]);
+    }
+  };
+
+  const startEditingExpense = (expenseId) => {
+    const currentShares = expenseShares
+      .filter(es => es.expense_id === expenseId)
+      .map(es => es.friend_id);
+    setEditingExpenseId(expenseId);
+    setEditingExpenseShares(currentShares);
+  };
+
+  const toggleEditingFriend = (friendId) => {
+    setEditingExpenseShares(prev =>
+      prev.includes(friendId) ? prev.filter(id => id !== friendId) : [...prev, friendId]
+    );
+  };
+
+  const saveExpenseShares = () => {
+    if (!editingExpenseId) return;
+
+    // Remove old shares for this expense
+    const filteredShares = expenseShares.filter(es => es.expense_id !== editingExpenseId);
+
+    // Add new shares
+    const newShares = editingExpenseShares.map(friendId => ({
+      id: `${editingExpenseId}-${friendId}`,
+      expense_id: editingExpenseId,
+      friend_id: friendId
+    }));
+
+    setExpenseShares([...filteredShares, ...newShares]);
+    setEditingExpenseId(null);
+    setEditingExpenseShares([]);
+  };
+
+  const cancelEditingExpense = () => {
+    setEditingExpenseId(null);
+    setEditingExpenseShares([]);
   };
 
   const calculateSplit = () => {
@@ -194,6 +317,9 @@ export default function Main() {
     setServiceFee('0');
     setTips('0');
     setDiscountValue('0');
+    setUploadError('');
+    setEditingExpenseId(null);
+    setEditingExpenseShares([]);
   };
 
   return (
@@ -224,12 +350,54 @@ export default function Main() {
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
                 />
               </div>
-              <button
+                            <button
                 onClick={createBill}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                disabled={!billAmount || parseFloat(billAmount) <= 0}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors"
               >
-                Start Splitting
+                Start Splitting Manually
               </button>
+              
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-slate-500">or</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isProcessing}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-orange-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Processing Bill...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-5 h-5" />
+                      Upload Bill Image
+                    </>
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                {uploadError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    {uploadError}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ) : (
@@ -365,35 +533,102 @@ export default function Main() {
                       .map(id => friends.find(f => f.id === id))
                       .filter(Boolean);
                     
+                    const isEditing = editingExpenseId === expense.id;
+                    
                     return (
-                      <div key={expense.id} className="flex items-start justify-between bg-slate-50 px-4 py-3 rounded-lg">
-                        <div className="flex-1">
-                          <div className="font-medium text-slate-800">{expense.dish_name}</div>
-                          <div className="text-sm text-slate-600 flex items-center gap-2 mt-1">
-                            <span>₹ {expense.cost.toFixed(2)}</span>
-                            <span>•</span>
-                            <div className="flex items-center gap-1">
-                              {sharedByFriends.map((friend, idx) => {
-                                const friendIndex = friends.findIndex(f => f.id === friend.id);
-                                return (
-                                  <div
-                                    key={friend.id}
-                                    className={`w-6 h-6 rounded-full ${getFriendColor(friendIndex)} flex items-center justify-center text-xs font-semibold text-white border-2 border-white shadow-sm`}
-                                    title={friend.name}
-                                  >
-                                    {getInitials(friend.name)}
+                      <div key={expense.id} className="bg-slate-50 px-4 py-3 rounded-lg">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="font-medium text-slate-800">{expense.dish_name}</div>
+                            <div className="text-sm text-slate-600 flex items-center gap-2 mt-1">
+                              <span>₹ {expense.cost.toFixed(2)}</span>
+                              {!isEditing && sharedByFriends.length > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <div className="flex items-center gap-1">
+                                    {sharedByFriends.map((friend) => {
+                                      const friendIndex = friends.findIndex(f => f.id === friend.id);
+                                      return (
+                                        <div
+                                          key={friend.id}
+                                          className={`w-6 h-6 rounded-full ${getFriendColor(friendIndex)} flex items-center justify-center text-xs font-semibold text-white border-2 border-white shadow-sm`}
+                                          title={friend.name}
+                                        >
+                                          {getInitials(friend.name)}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                );
-                              })}
+                                </>
+                              )}
+                              {!isEditing && sharedByFriends.length === 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-orange-600 font-medium">Not assigned</span>
+                                </>
+                              )}
                             </div>
                           </div>
+                          <div className="flex items-center gap-2 ml-2">
+                            {!isEditing && friends.length > 0 && (
+                              <button
+                                onClick={() => startEditingExpense(expense.id)}
+                                className="text-blue-500 hover:text-blue-700 transition-colors"
+                                title="Edit who shares this"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => removeExpense(expense.id)}
+                              className="text-red-500 hover:text-red-700 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          onClick={() => removeExpense(expense.id)}
-                          className="text-red-500 hover:text-red-700 transition-colors ml-2"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        
+                        {isEditing && (
+                          <div className="mt-3 pt-3 border-t border-slate-200">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                              Who shares this expense?
+                            </label>
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                              {friends.map((friend, index) => (
+                                <button
+                                  key={friend.id}
+                                  onClick={() => toggleEditingFriend(friend.id)}
+                                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                                    editingExpenseShares.includes(friend.id)
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                                  }`}
+                                >
+                                  <div className={`w-6 h-6 rounded-full ${editingExpenseShares.includes(friend.id) ? 'bg-white/20' : getFriendColor(index)} flex items-center justify-center text-xs font-semibold ${editingExpenseShares.includes(friend.id) ? 'text-white' : 'text-white'}`}>
+                                    {getInitials(friend.name)}
+                                  </div>
+                                  {friend.name}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={saveExpenseShares}
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                              >
+                                <Check className="w-4 h-4" />
+                                Save
+                              </button>
+                              <button
+                                onClick={cancelEditingExpense}
+                                className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                              >
+                                <X className="w-4 h-4" />
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
