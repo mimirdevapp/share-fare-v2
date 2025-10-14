@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Users, ReceiptIndianRupee, Calculator, ListChecks, ReceiptText, BadgePercent, ScanText, Loader2, X, Edit2, Check, Hash } from 'lucide-react';
+import { Plus, Trash2, Users, ReceiptIndianRupee, Calculator, ListChecks, ReceiptText, Send , BadgePercent, ScanText, Loader2, X, Edit2, Check, Hash } from 'lucide-react';
 
 // Color palette for friend avatars
 const AVATAR_COLORS = [
@@ -33,6 +33,17 @@ const getInitials = (name) => {
     .join('')
     .toUpperCase()
     .slice(0, 2);
+};
+const generateShareMessage = (perPerson, billAmount, totalCalculated, difference) => {
+  let message = `*ShareFare - Bill Split Summary*\n\n`;
+  message += `Bill Amount: ₹${parseFloat(billAmount).toFixed(2)}\n\n`;
+  message += `*Individual Breakdown:*\n`;
+  
+  Object.values(perPerson).forEach((person) => {
+    message += `• ${person.name}: ₹${person.amount.toFixed(2)}\n`;
+  });
+  
+  return encodeURIComponent(message);
 };
 
 export default function Main() {
@@ -90,6 +101,12 @@ export default function Main() {
   const createBill = () => {
     if (!billAmount || parseFloat(billAmount) <= 0) return;
     setCurrentBillId(Date.now().toString());
+  };
+
+  const shareOnWhatsApp = () => {
+    const message = generateShareMessage(perPerson, billAmount, totalCalculated, difference);
+    const whatsappUrl = `https://wa.me/?text=${message}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   const processBillImage = async (file) => {
@@ -813,12 +830,22 @@ export default function Main() {
                     )}
                   </div>
 
-                  <button
-                    onClick={resetBill}
-                    className="w-full bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors mt-4"
-                  >
-                    New Bill
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      onClick={shareOnWhatsApp}
+                      disabled={friends.length === 0}
+                      className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-4 h-4" />
+                      Share on WhatsApp
+                    </button>
+                    <button
+                      onClick={resetBill}
+                      className="w-full bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                    >
+                      New Bill
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
