@@ -437,34 +437,6 @@ export default function Main() {
                   <Users className="w-5 h-5 text-blue-600" />
                   Friends
                 </h2>
-                <div className="mb-4 px-1.5 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-1 px-1">
-                  <Hash className="w-4 h-4" />
-                    Group Code (optional)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={groupCode}
-                      onChange={(e) => {
-                        setGroupCode(e.target.value);
-                        setGroupCodeError('');
-                      }}
-                      onKeyPress={(e) => e.key === 'Enter' && applyGroupCode()}
-                      placeholder="Enter group code"
-                      className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <button
-                      onClick={applyGroupCode}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                  {groupCodeError && (
-                    <p className="text-sm text-red-600 mt-2">{groupCodeError}</p>
-                  )}
-                </div>
                 <div className="flex gap-2 mb-4">
                   <input
                     type="text"
