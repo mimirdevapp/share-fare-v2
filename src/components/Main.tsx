@@ -432,7 +432,7 @@ export default function Main() {
         ) : (
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-xl shadow-lg p-6">
+<div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
                   <Users className="w-5 h-5 text-blue-600" />
                   Friends
@@ -452,6 +452,34 @@ export default function Main() {
                   >
                     <Plus className="w-5 h-5" />
                   </button>
+                </div>
+                <div className="mb-4 p-3 border border-purple-300 rounded-lg bg-purple-50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Hash className="w-4 h-4 text-purple-600" />
+                    <label className="text-sm font-medium">Or use a group code</label>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={groupCode}
+                      onChange={(e) => {
+                        setGroupCode(e.target.value);
+                        setGroupCodeError('');
+                      }}
+                      onKeyPress={(e) => e.key === 'Enter' && applyGroupCode()}
+                      placeholder="Enter group code"
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm"
+                    />
+                    <button
+                      onClick={applyGroupCode}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors font-medium text-sm whitespace-nowrap"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  {groupCodeError && (
+                    <p className="text-red-600 text-sm mt-2">{groupCodeError}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   {friends.map((friend, index) => (
