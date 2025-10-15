@@ -38,11 +38,11 @@ const generateShareMessage = (perPerson, billAmount, totalCalculated, difference
   let message = `*ShareFare - Bill Split Summary*\n\n`;
   message += `Bill Amount: ₹${parseFloat(billAmount).toFixed(2)}\n\n`;
   message += `*Individual Breakdown:*\n`;
-  
+
   Object.values(perPerson).forEach((person) => {
     message += `• ${person.name}: ₹${person.amount.toFixed(2)}\n`;
   });
-  
+
   return encodeURIComponent(message);
 };
 
@@ -128,7 +128,7 @@ export default function Main() {
         const error = await response.json();
         throw new Error(error.error?.message || 'Failed to process image');
       }
-  
+
       const data = await response.json();
 
       if (!data.success || !data.billData) {
@@ -201,7 +201,7 @@ export default function Main() {
     if (!groupCode.trim() || !currentBillId) return;
 
     const friendNames = FRIEND_GROUPS[groupCode.toLowerCase()];
-    
+
     if (!friendNames) {
       setGroupCodeError('Invalid group code');
       return;
@@ -269,51 +269,53 @@ export default function Main() {
   };
 
   const sendToSplitwise = async () => {
-  // Note: This requires your backend to handle OAuth
-  // You'll need to set up a backend endpoint that:
-  // 1. Handles Splitwise OAuth flow
-  // 2. Creates expenses with the split data
+  setSplitWiseLoading(true);
   
-    setSplitWiseLoading(true);
-    
-    try {
-      const expenseData = Object.values(perPerson).map(person => ({
-        name: person.name,
-        amount: person.amount,
-        items: person.items
-      }));
+  try {
+    const expenseData = Object.values(perPerson).map(person => ({
+      name: person.name,
+      amount: person.amount,
+    }));
 
-      const response = await fetch('YOUR_BACKEND_URL/api/splitwise/add-expense', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          billAmount: parseFloat(billAmount),
-          billDescription: 'Bill Split - ShareFare',
-          expenses: expenseData,
-          timestamp: new Date().toISOString()
-        })
-      });
+    const response = await fetch('https://enki-service.vercel.app/api/splitwise-add-expense', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        billAmount: parseFloat(billAmount),
+        billDescription: `ShareFare Bill`,
+        expenses: expenseData
+      })
+    });
 
-      if (!response.ok) {
-        throw new Error('Failed to sync with Splitwise');
-      }
-
-      const data = await response.json();
-      
-      // Redirect to Splitwise or show success
-      if (data.redirectUrl) {
-        window.open(data.redirectUrl, '_blank');
-      } else {
-        alert('Expenses added to Splitwise successfully!');
-      }
-    } catch (error) {
-      throw new Error(error.message);
-    } finally {
-      setSplitWiseLoading(false);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to sync with Splitwise');
     }
-  };
+
+    const data = await response.json();
+    
+    if (data.notFound && data.notFound.length > 0) {
+      alert(`${data.message}\n\nThese friends weren't found in your Splitwise account. Please add them first:\n${data.notFound.join(', ')}`);
+    } else {
+      const splitwiseUrl = 'https://secure.splitwise.com/applinks/open';
+      const splitwiseWeb = 'https://secure.splitwise.com';
+      
+      // Try to open the app first, fallback to web
+      window.location.href = splitwiseUrl;
+      setTimeout(() => {
+        window.open(splitwiseWeb, '_blank');
+      }, 500);
+    }
+    
+  } catch (error) {
+    alert(`Failed to add to Splitwise: ${error.message}`);
+  } finally {
+    setSplitWiseLoading(false);
+  }
+};
+
 
   const saveExpenseShares = () => {
     if (!editingExpenseId) return;
@@ -421,7 +423,7 @@ export default function Main() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
-          <h1 onClick={() => resetBill()}className="text-4xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-3">
+          <h1 onClick={() => resetBill()} className="text-4xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-3">
             <ReceiptIndianRupee className="w-10 h-10 text-blue-600" />
             ShareFare
           </h1>
@@ -445,14 +447,14 @@ export default function Main() {
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
                 />
               </div>
-                            <button
+              <button
                 onClick={createBill}
                 disabled={!billAmount || parseFloat(billAmount) <= 0}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors"
               >
                 Start Splitting Manually
               </button>
-              
+
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-300"></div>
@@ -498,7 +500,7 @@ export default function Main() {
         ) : (
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
-<div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
                   <Users className="w-5 h-5 text-blue-600" />
                   Friends
@@ -623,11 +625,10 @@ export default function Main() {
                           <button
                             key={friend.id}
                             onClick={() => toggleFriendSelection(friend.id)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                              selectedFriends.includes(friend.id)
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${selectedFriends.includes(friend.id)
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
                           >
                             <div className={`w-6 h-6 rounded-full ${selectedFriends.includes(friend.id) ? 'bg-white/20' : getFriendColor(index)} flex items-center justify-center text-xs font-semibold ${selectedFriends.includes(friend.id) ? 'text-white' : 'text-white'}`}>
                               {getInitials(friend.name)}
@@ -655,9 +656,9 @@ export default function Main() {
                     const sharedByFriends = sharedByIds
                       .map(id => friends.find(f => f.id === id))
                       .filter(Boolean);
-                    
+
                     const isEditing = editingExpenseId === expense.id;
-                    
+
                     return (
                       <div key={expense.id} className="bg-slate-50 px-4 py-3 rounded-lg">
                         <div className="flex items-start justify-between mb-2">
@@ -710,7 +711,7 @@ export default function Main() {
                             </button>
                           </div>
                         </div>
-                        
+
                         {isEditing && (
                           <div className="mt-3 pt-3 border-t border-slate-200">
                             <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -721,11 +722,10 @@ export default function Main() {
                                 <button
                                   key={friend.id}
                                   onClick={() => toggleEditingFriend(friend.id)}
-                                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                                    editingExpenseShares.includes(friend.id)
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                                  }`}
+                                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${editingExpenseShares.includes(friend.id)
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                                    }`}
                                 >
                                   <div className={`w-6 h-6 rounded-full ${editingExpenseShares.includes(friend.id) ? 'bg-white/20' : getFriendColor(index)} flex items-center justify-center text-xs font-semibold ${editingExpenseShares.includes(friend.id) ? 'text-white' : 'text-white'}`}>
                                     {getInitials(friend.name)}
@@ -845,9 +845,8 @@ export default function Main() {
                       <span>Calculated Total:</span>
                       <span className="font-semibold">₹ {totalCalculated.toFixed(2)}</span>
                     </div>
-                    <div className={`flex justify-between text-sm font-semibold ${
-                      Math.abs(difference) < 0.01 ? 'text-green-600' : 'text-red-600'
-                    }`}>
+                    <div className={`flex justify-between text-sm font-semibold ${Math.abs(difference) < 0.01 ? 'text-green-600' : 'text-red-600'
+                      }`}>
                       <span>Difference:</span>
                       <span>₹ {Math.abs(difference).toFixed(2)}</span>
                     </div>
@@ -888,7 +887,7 @@ export default function Main() {
                       <Send className="w-4 h-4" />
                       Share on WhatsApp
                     </button>
-                     <button
+                    <button
                       onClick={sendToSplitwise}
                       disabled={friends.length === 0 || splitwiseLoading}
                       className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
