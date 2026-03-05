@@ -127,7 +127,7 @@ Error generating stack: `+i.message+`
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const hs=pe("X",[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]]),vs=["bg-blue-500","bg-green-500","bg-purple-500","bg-pink-500","bg-yellow-500","bg-red-500","bg-indigo-500","bg-teal-500","bg-orange-500","bg-cyan-500"],Rp={ecityhp:["Shetty","Madhu","Shaun","Sai","Calvin","Gaman","Rishika","Siddhanth","Sharanya","Rachana"],hsr:["Calvin","Gaman","Hardhik","Jason"]},$n=e=>vs[e%vs.length],Un=e=>e.split(" ").map(t=>t[0]).join("").toUpperCase().slice(0,2),Op=(e,t,n,r)=>{let l=`*ShareFare - Bill Split Summary*
+ */const hs=pe("X",[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]]),vs=["bg-blue-500","bg-green-500","bg-purple-500","bg-pink-500","bg-yellow-500","bg-red-500","bg-indigo-500","bg-teal-500","bg-orange-500","bg-cyan-500"],Rp={ecityhp:["Ananya S.","Madhurima G.","Shaun A.","Sai","Calvin","Gaman","Sanjana S.","Siddhant✨","Sharanya N.","Hardhik S.","Akshay k."],hsr:["Calvin","Gaman","Hardhik S.","Jason"]},$n=e=>vs[e%vs.length],Un=e=>e.split(" ").map(t=>t[0]).join("").toUpperCase().slice(0,2),Op=(e,t,n,r)=>{let l=`*ShareFare - Bill Split Summary*
 
 `;return l+=`Bill Amount: ₹${parseFloat(t).toFixed(2)}
 
