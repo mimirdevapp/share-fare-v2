@@ -74,6 +74,9 @@ export default function Main() {
   const [editingExpenseShares, setEditingExpenseShares] = useState([]);
 
   const [splitwiseLoading, setSplitWiseLoading] = useState(false);
+  
+  const [isEditingBillAmount, setIsEditingBillAmount] = useState(false);
+  const [editedBillAmount, setEditedBillAmount] = useState(billAmount);
 
   // Load saved friends and API key on mount
   useEffect(() => {
@@ -86,6 +89,11 @@ export default function Main() {
       console.log('Session storage not available');
     }
   }, []);
+
+  // Update edited bill amount when billAmount changes
+  useEffect(() => {
+    setEditedBillAmount(billAmount);
+  }, [billAmount]);
 
   // Save friends whenever they change
   useEffect(() => {
@@ -119,7 +127,7 @@ export default function Main() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("https://enki-service.vercel.app/api/share-fare-service", {
+      const response = await fetch("http://localhost:3000/api/share-fare-service", {
         method: "POST",
         body: formData,
       });
@@ -340,6 +348,18 @@ export default function Main() {
     setEditingExpenseShares([]);
   };
 
+  const saveBillAmount = () => {
+    if (editedBillAmount && parseFloat(editedBillAmount) > 0) {
+      setBillAmount(editedBillAmount);
+      setIsEditingBillAmount(false);
+    }
+  };
+
+  const cancelEditingBillAmount = () => {
+    setEditedBillAmount(billAmount);
+    setIsEditingBillAmount(false);
+  };
+
   const calculateSplit = () => {
     if (friends.length === 0) {
       return { perPerson: {}, totalCalculated: 0, difference: 0 };
@@ -417,6 +437,8 @@ export default function Main() {
     setUploadError('');
     setEditingExpenseId(null);
     setEditingExpenseShares([]);
+    setIsEditingBillAmount(false);
+    setEditedBillAmount('');
   };
 
   return (
@@ -837,10 +859,42 @@ export default function Main() {
                 </h2>
                 <div className="space-y-4">
                   <div className="pb-4 border-b border-slate-200">
-                    <div className="flex justify-between text-sm text-slate-600 mb-1">
-                      <span>Bill Amount:</span>
-                      <span className="font-semibold">₹ {parseFloat(billAmount).toFixed(2)}</span>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm text-slate-600">Bill Amount:</span>
+                      {!isEditingBillAmount && (
+                        <span
+                          onClick={() => setIsEditingBillAmount(true)}
+                          className="font-semibold text-sm border-b-2 border-dotted border-blue-500 cursor-pointer hover:border-blue-700 transition-colors"
+                          title="Click to edit bill amount"
+                        >
+                          ₹ {parseFloat(billAmount).toFixed(2)}
+                        </span>
+                      )}
                     </div>
+                    {isEditingBillAmount && (
+                      <div className="flex gap-2 items-center mb-3">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editedBillAmount}
+                          onChange={(e) => setEditedBillAmount(e.target.value)}
+                          className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          autoFocus
+                        />
+                        <button
+                          onClick={saveBillAmount}
+                          className="bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg transition-colors"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={cancelEditingBillAmount}
+                          className="bg-slate-200 hover:bg-slate-300 text-slate-700 p-2 rounded-lg transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm text-slate-600 mb-1">
                       <span>Calculated Total:</span>
                       <span className="font-semibold">₹ {totalCalculated.toFixed(2)}</span>
