@@ -16,8 +16,8 @@ const AVATAR_COLORS = [
 ];
 
 const FRIEND_GROUPS = {
-  'ecityhp': ['Shetty', 'Madhu', 'Shaun', 'Sai', 'Calvin', 'Gaman', 'Rishika', 'Siddhanth', 'Sharanya', 'Rachana'],
-  'hsr': ['Calvin', 'Gaman', 'Hardhik', 'Jason'],
+  'ecityhp': ['Ananya S.', 'Madhurima G.', 'Shaun A.', 'Sai', 'Calvin', 'Gaman', 'Sanjana S.', 'Siddhant✨', 'Sharanya N.', 'Hardhik S.', 'Akshay k.'],
+  'hsr': ['Calvin', 'Gaman', 'Hardhik S.', 'Jason'],
 };
 
 // Helper function to get friend color
