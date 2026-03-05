@@ -127,7 +127,7 @@ export default function Main() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("http://localhost:3000/api/share-fare-service", {
+      const response = await fetch("https://enki-service.vercel.app/api/share-fare-service", {
         method: "POST",
         body: formData,
       });
